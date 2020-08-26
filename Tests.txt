@@ -1,0 +1,6 @@
+Test AddUser:
+curl --data '{"method":"adduser","data":{"add_user":{"first_name":"kotik","last_name":"katya"}}}' --header "Content-Type: application/json" http://localhost:8080/AddUser
+
+
+Test Transuction:
+curl --data '{"method":"replenishment","data":{"replenishment":{"id":4,"value":3.2}}}' --header "Content-Type: application/json" http://localhost:8080/Replenishment
