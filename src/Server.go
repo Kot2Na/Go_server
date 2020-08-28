@@ -63,78 +63,77 @@ type ResponseData struct {
 
 //ResponseStruct asd
 type ResponseStruct struct {
-	Status int
 	Method string
 	Data   ResponseData
+}
+
+//SendResponse asd
+func SendResponse(response *ResponseStruct, w *http.ResponseWriter) {
+	responseJSON, _ := json.Marshal(*response)
+	(*w).Write(responseJSON)
 }
 
 //ReadRequest asd
 func ReadRequest(r *http.Request, request *RequestStruct) error {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		fmt.Println("error read body")
 		return err
 	}
 	err = json.Unmarshal(body, request)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 //AddUser method is created to add users
 func (env *Env) AddUser(w http.ResponseWriter, r *http.Request) {
 	var request RequestStruct
 	var response ResponseStruct
-	err := ReadRequest(r, &request)
-	if err != nil {
-		fmt.Println("error read request")
+	if err := ReadRequest(r, &request); err != nil {
+		http.Error(w, err.Error(), 300)
 		return
 	}
 	result, err := env.db.Exec("insert into users_info (first_name, last_name, reg_date) values(?,?,now())",
 		request.Data.User.FirstName, request.Data.User.LastName)
 	if err != nil {
-		fmt.Println("error add user to database")
+		http.Error(w, "Error add user to database", 500)
 		return
 	}
-	response.Method = request.Method
-	response.Status = 0
-	response.Data.Message = "User have benn created successfully"
 	response.Data.IDUser, _ = result.LastInsertId()
-	responseJSON, _ := json.Marshal(response)
-	result, err = env.db.Exec("insert into users_balance values(?,0)",
-		response.Data.IDUser)
-	if err != nil {
-		fmt.Println("error set user's balance to database")
+	if _, err := env.db.Exec("insert into users_balance values(?,0)",
+		response.Data.IDUser); err != nil {
+		http.Error(w, "Error set user's balance to database", 500)
 		return
 	}
-	w.Write(responseJSON)
+	response.Data.Message = "User have been created successfully"
+	response.Method = request.Method
+	SendResponse(&response, &w)
 }
 
 //Replenishment asd
 func (env *Env) Replenishment(w http.ResponseWriter, r *http.Request) {
 	var request RequestStruct
 	var response ResponseStruct
-	err := ReadRequest(r, &request)
-	if err != nil {
-		fmt.Println("error read request")
+	if err := ReadRequest(r, &request); err != nil {
+		http.Error(w, err.Error(), 300)
 		return
 	}
 	result, err := env.db.Exec("insert into transuctions (user_id, tr_value, info, tr_date) values(?,?,?,now())",
 		request.Data.ReplenishmentData.ID, request.Data.ReplenishmentData.Value, "replenishment")
 	if err != nil {
-		fmt.Println("error add trunsuction to database")
+		http.Error(w, "Error add trunsuction to database", 500)
+		return
+	}
+	if _, err = env.db.Exec("update users_balance set balance = balance + ? where user_id = ?",
+		request.Data.ReplenishmentData.Value, request.Data.ReplenishmentData.ID); err != nil {
+		http.Error(w, "Error update user balance", 500)
 		return
 	}
 	response.Method = request.Method
-	response.Status = 0
 	response.Data.Message = "Transuction have been created successfully"
 	response.Data.IDTrunsuction, _ = result.LastInsertId()
-	responseJSON, _ := json.Marshal(response)
-	result, err = env.db.Exec("update users_balance set balance = balance + ? where user_id = ?",
-		request.Data.ReplenishmentData.Value, request.Data.ReplenishmentData.ID)
-	if err != nil {
-		fmt.Println("error update user balance")
-		return
-	}
-	w.Write(responseJSON)
+	SendResponse(&response, &w)
 }
 
 func main() {
