@@ -29,12 +29,3 @@ create table transuctions (
     foreign key (user_id) references users_info (user_id), 
     primary key (tr_id, user_id)
 );
-
-create table transfers (
-	user_id int unsigned not null,
-    tr_id int unsigned not null,
-    
-    foreign key (user_id) references users_info (user_id), 
-    foreign key (tr_id) references transuctions (tr_id),
-    primary key (tr_id)
-)
