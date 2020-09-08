@@ -1,6 +1,16 @@
 Test AddUser:
 curl --data '{"method":"adduser","data":{"add_user":{"first_name":"kotik","last_name":"katya"}}}' --header "Content-Type: application/json" http://localhost:8080/AddUser
 
-
-Test Transuction:
+Test Transaction:
 curl --data '{"method":"replenishment","data":{"replenishment":{"id":4,"value":3.2}}}' --header "Content-Type: application/json" http://localhost:8080/Replenishment
+
+Test Withdrawal:
+curl --data '{"method":"withdrawal","data":{"withdrawal":{"id":9,"value":3.2}}}' --header "Content-Type: application/json" http://localhost:8080/Withdrawal
+
+Test Transfer:
+curl --data '{"method":"transfer","data":{"transfer":{"id_from":9,"id_to":10,"value":3.2}}}' --header "Content-Type: application/json" http://localhost:8080/Transfer
+
+Test Balance:
+curl --data '{"method":"balance","data":{"user":{"id":10}, "currency":"EUR"}}' --header "Content-Type: application/json" http://localhost:8080/Balance
+curl --data '{"method":"balance","data":{"user":{"id":10}, "currency":"RUB"}}' --header "Content-Type: application/json" http://localhost:8080/Balance
+curl --data '{"method":"balance","data":{"user":{"id":10}, "currency":"USD"}}' --header "Content-Type: application/json" http://localhost:8080/Balance
