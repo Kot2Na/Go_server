@@ -19,7 +19,7 @@ create table users_balance (
     primary key (user_id)
 );
 
-create table transuctions (
+create table transactions (
 	tr_id int unsigned not null auto_increment,
     user_id int unsigned not null,
     tr_value double not null,
