@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net/http"
-	"strconv"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -166,14 +166,14 @@ func (env *Env) Balance(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	result := env.db.QueryRow("select round(balance, 2) from users_balance where user_id = ?",
+	result := env.db.QueryRow("select round(balance, 3) from users_balance where user_id = ?",
 		request.Data.User.IDUser)
 	if err := result.Scan(&balance); err != nil {
 		http.Error(w, err.Error(), 300)
 		return
 	}
 	if request.Data.Currency != "RUB" {
-		var result map[string]map[string]interface{}
+		var result map[string]map[string]float64
 		r, err := http.Get("https://api.exchangeratesapi.io/latest?base=RUB")
 		if err != nil {
 			http.Error(w, err.Error(), 300)
@@ -181,8 +181,7 @@ func (env *Env) Balance(w http.ResponseWriter, r *http.Request) {
 		}
 		byteValue, _ := ioutil.ReadAll(r.Body)
 		json.Unmarshal([]byte(byteValue), &result)
-		rates, err := strconv.ParseFloat(fmt.Sprint(result["rates"][request.Data.Currency]), 64)
-		balance = balance * rates
+		balance = math.Round(balance*result["rates"][request.Data.Currency]*1000) / 1000
 	}
 	response.Data.IDUser = request.Data.User.IDUser
 	response.Data.UserBalance = balance
