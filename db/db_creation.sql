@@ -1,4 +1,6 @@
 create database if not exists balance_service;
+create user go_server@localhost identified by pass;
+grant all privileges on balance_service.* to go_server@localhost;
 
 use balance_service;
 
