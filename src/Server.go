@@ -11,6 +11,13 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+// Transaction asd
+type Transaction struct {
+	Info  string  `json:"info"`
+	Value float64 `json:"value"`
+	Date  string  `json:"date"`
+}
+
 // Env asd
 type Env struct {
 	db *sql.DB
@@ -49,6 +56,7 @@ type RequestData struct {
 	TransferData      TransferStruct      `json:"transfer"`
 	User              UserStruct          `json:"user"`
 	Currency          string              `json:"currency"`
+	Sort              string              `json:"sort"`
 }
 
 //RequestStruct is data struct, that will contain json request fields
@@ -59,10 +67,11 @@ type RequestStruct struct {
 
 //ResponseData asd
 type ResponseData struct {
-	Message       string
-	IDUser        int64
-	IDTrunsuction int64
-	UserBalance   float64
+	Message           string
+	IDUser            int64
+	IDTrunsuction     int64
+	UserBalance       float64
+	UsersTransactions []Transaction `json:"userstransactions"`
 }
 
 //ResponseStruct asd
@@ -126,6 +135,43 @@ func (env *Env) ChangeBalance(userid int64, sum float64) error {
 		return err
 	}
 	return nil
+}
+
+// GetTransactionList asd
+func (env *Env) GetTransactionList(w http.ResponseWriter, r *http.Request) {
+	var request RequestStruct
+	var response ResponseStruct
+	var sort string
+	if err := ReadRequest(r, &request); err != nil {
+		http.Error(w, err.Error(), 300)
+		return
+	}
+	if err := env.CheckUser(request.Data.User.IDUser); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	if request.Data.Sort == "time" {
+		sort = "tr_date"
+	} else {
+		sort = "ABS(tr_value)"
+	}
+	qtext := fmt.Sprintf("select info, tr_value, tr_date from transactions where user_id = %d order by %s desc", request.Data.User.IDUser, sort)
+	rows, err := env.db.Query(qtext)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	for rows.Next() {
+		var Tr Transaction
+		if err2 := rows.Scan(&Tr.Info, &Tr.Value, &Tr.Date); err2 != nil {
+			http.Error(w, err2.Error(), 500)
+			return
+		}
+		response.Data.UsersTransactions = append(response.Data.UsersTransactions, Tr)
+	}
+	response.Data.Message = "List have been created"
+	response.Method = request.Method
+	SendResponse(&response, &w)
 }
 
 //AddUser method is created to add users
@@ -308,5 +354,6 @@ func main() {
 	http.HandleFunc("/Withdrawal", env.Withdrawal)
 	http.HandleFunc("/Transfer", env.Transfer)
 	http.HandleFunc("/Balance", env.Balance)
+	http.HandleFunc("/Transactions", env.GetTransactionList)
 	http.ListenAndServe(":8080", nil)
 }
