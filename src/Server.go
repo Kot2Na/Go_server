@@ -109,7 +109,7 @@ func (env *Env) CheckUser(userid int64) error {
 		return fmt.Errorf("Database: read error")
 	}
 	if flag == 0 {
-		return fmt.Errorf("Request: user is not exist")
+		return fmt.Errorf("Request: user %d is not exist", userid)
 	}
 	return nil
 }
@@ -139,207 +139,232 @@ func (env *Env) ChangeBalance(userid int64, sum float64) error {
 
 // GetTransactionList method returns list of users transaction
 func (env *Env) GetTransactionList(w http.ResponseWriter, r *http.Request) {
-	var request RequestStruct
-	var response ResponseStruct
-	var sort string
-	if err := ReadRequest(r, &request); err != nil {
-		http.Error(w, err.Error(), 300)
-		return
-	}
-	if err := env.CheckUser(request.Data.User.IDUser); err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	if request.Data.Sort == "time" {
-		sort = "tr_date"
-	} else {
-		sort = "ABS(tr_value)"
-	}
-	qtext := fmt.Sprintf("select info, tr_value, tr_date from transactions where user_id = %d order by %s desc", request.Data.User.IDUser, sort)
-	rows, err := env.db.Query(qtext)
-	if err != nil {
-		http.Error(w, "Database: read table error", 500)
-		return
-	}
-	for rows.Next() {
-		var Tr Transaction
-		if err2 := rows.Scan(&Tr.Info, &Tr.Value, &Tr.Date); err2 != nil {
-			http.Error(w, "Database: scan table error", 500)
+	if r.Method == "POST" {
+		var request RequestStruct
+		var response ResponseStruct
+		var sort string
+		if err := ReadRequest(r, &request); err != nil {
+			http.Error(w, err.Error(), 300)
 			return
 		}
-		response.Data.UsersTransactions = append(response.Data.UsersTransactions, Tr)
+		if err := env.CheckUser(request.Data.User.IDUser); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		if request.Data.Sort == "time" {
+			sort = "tr_date"
+		} else {
+			sort = "ABS(tr_value)"
+		}
+		qtext := fmt.Sprintf("select info, tr_value, tr_date from transactions where user_id = %d order by %s desc", request.Data.User.IDUser, sort)
+		rows, err := env.db.Query(qtext)
+		if err != nil {
+			http.Error(w, "Database: read table error", 500)
+			return
+		}
+		for rows.Next() {
+			var Tr Transaction
+			if err2 := rows.Scan(&Tr.Info, &Tr.Value, &Tr.Date); err2 != nil {
+				http.Error(w, "Database: scan table error", 500)
+				return
+			}
+			response.Data.UsersTransactions = append(response.Data.UsersTransactions, Tr)
+		}
+		response.Data.Message = "List have been created"
+		response.Method = request.Method
+		SendResponse(&response, &w)
+	} else {
+		http.Error(w, "Request: method", 500)
 	}
-	response.Data.Message = "List have been created"
-	response.Method = request.Method
-	SendResponse(&response, &w)
 }
 
 //AddUser method is created to add users
 func (env *Env) AddUser(w http.ResponseWriter, r *http.Request) {
-	var request RequestStruct
-	var response ResponseStruct
-	if err := ReadRequest(r, &request); err != nil {
-		http.Error(w, err.Error(), 300)
-		return
+	if r.Method == "POST" {
+		var request RequestStruct
+		var response ResponseStruct
+		if err := ReadRequest(r, &request); err != nil {
+			http.Error(w, err.Error(), 300)
+			return
+		}
+		result, err := env.db.Exec("insert into users_info (first_name, last_name, reg_date) values(?,?,now())",
+			request.Data.User.FirstName, request.Data.User.LastName)
+		if err != nil {
+			http.Error(w, "Database: error add user to database", 500)
+			return
+		}
+		response.Data.IDUser, _ = result.LastInsertId()
+		if _, err := env.db.Exec("insert into users_balance values(?,0)",
+			response.Data.IDUser); err != nil {
+			http.Error(w, "Database: error set user's balance to database", 500)
+			return
+		}
+		response.Data.Message = "User have been created successfully"
+		response.Method = request.Method
+		SendResponse(&response, &w)
+	} else {
+		http.Error(w, "Request: method", 500)
 	}
-	result, err := env.db.Exec("insert into users_info (first_name, last_name, reg_date) values(?,?,now())",
-		request.Data.User.FirstName, request.Data.User.LastName)
-	if err != nil {
-		http.Error(w, "Database: error add user to database", 500)
-		return
-	}
-	response.Data.IDUser, _ = result.LastInsertId()
-	if _, err := env.db.Exec("insert into users_balance values(?,0)",
-		response.Data.IDUser); err != nil {
-		http.Error(w, "Database: error set user's balance to database", 500)
-		return
-	}
-	response.Data.Message = "User have been created successfully"
-	response.Method = request.Method
-	SendResponse(&response, &w)
 }
 
 //Balance method returns the value of user's balance in different currency
 func (env *Env) Balance(w http.ResponseWriter, r *http.Request) {
-	var request RequestStruct
-	var response ResponseStruct
-	var balance float64
-	if err := ReadRequest(r, &request); err != nil {
-		http.Error(w, err.Error(), 300)
-		return
-	}
-	if err := env.CheckUser(request.Data.User.IDUser); err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	result := env.db.QueryRow("select round(balance, 3) from users_balance where user_id = ?",
-		request.Data.User.IDUser)
-	if err := result.Scan(&balance); err != nil {
-		http.Error(w, "Database: read error", 300)
-		return
-	}
-	if request.Data.Currency != "RUB" {
-		var result map[string]map[string]float64
-		r, err := http.Get("https://api.exchangeratesapi.io/latest?base=RUB")
-		if err != nil {
-			http.Error(w, "Currency service does't respond", 300)
+	if r.Method == "POST" {
+		var request RequestStruct
+		var response ResponseStruct
+		var balance float64
+		if err := ReadRequest(r, &request); err != nil {
+			http.Error(w, err.Error(), 300)
 			return
 		}
-		byteValue, _ := ioutil.ReadAll(r.Body)
-		json.Unmarshal([]byte(byteValue), &result)
-		balance = math.Round(balance*result["rates"][request.Data.Currency]*1000) / 1000
+		if err := env.CheckUser(request.Data.User.IDUser); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		result := env.db.QueryRow("select round(balance, 3) from users_balance where user_id = ?",
+			request.Data.User.IDUser)
+		if err := result.Scan(&balance); err != nil {
+			http.Error(w, "Database: read error", 300)
+			return
+		}
+		if request.Data.Currency != "RUB" {
+			var result map[string]map[string]float64
+			r, err := http.Get("https://api.exchangeratesapi.io/latest?base=RUB")
+			if err != nil {
+				http.Error(w, "Currency service does't respond", 300)
+				return
+			}
+			byteValue, _ := ioutil.ReadAll(r.Body)
+			json.Unmarshal([]byte(byteValue), &result)
+			balance = math.Round(balance*result["rates"][request.Data.Currency]*1000) / 1000
+		}
+		response.Data.IDUser = request.Data.User.IDUser
+		response.Data.UserBalance = balance
+		response.Data.Message = "User's balance"
+		response.Method = request.Method
+		SendResponse(&response, &w)
+	} else {
+		http.Error(w, "Request: method", 500)
 	}
-	response.Data.IDUser = request.Data.User.IDUser
-	response.Data.UserBalance = balance
-	response.Data.Message = "User's balance"
-	response.Method = request.Method
-	SendResponse(&response, &w)
 }
 
 //Replenishment asd
 func (env *Env) Replenishment(w http.ResponseWriter, r *http.Request) {
-	var request RequestStruct
-	var response ResponseStruct
-	if err := ReadRequest(r, &request); err != nil {
-		http.Error(w, err.Error(), 300)
-		return
+	if r.Method == "POST" {
+		var request RequestStruct
+		var response ResponseStruct
+		if err := ReadRequest(r, &request); err != nil {
+			http.Error(w, err.Error(), 300)
+			return
+		}
+		if err := env.CheckUser(request.Data.ReplenishmentData.ID); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		result, err := env.db.Exec("insert into transactions (user_id, tr_value, info, tr_date) values(?,?,?,now())",
+			request.Data.ReplenishmentData.ID, request.Data.ReplenishmentData.Value, "replenishment")
+		if err != nil {
+			http.Error(w, "Database: error add transaction to database", 500)
+			return
+		}
+		if err = env.ChangeBalance(request.Data.ReplenishmentData.ID, request.Data.ReplenishmentData.Value); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		response.Method = request.Method
+		response.Data.Message = "transaction have been created successfully"
+		response.Data.IDTrunsuction, _ = result.LastInsertId()
+		SendResponse(&response, &w)
+	} else {
+		http.Error(w, "Request: method", 500)
 	}
-	if err := env.CheckUser(request.Data.ReplenishmentData.ID); err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	result, err := env.db.Exec("insert into transactions (user_id, tr_value, info, tr_date) values(?,?,?,now())",
-		request.Data.ReplenishmentData.ID, request.Data.ReplenishmentData.Value, "replenishment")
-	if err != nil {
-		http.Error(w, "Database: error add transaction to database", 500)
-		return
-	}
-	if err = env.ChangeBalance(request.Data.ReplenishmentData.ID, request.Data.ReplenishmentData.Value); err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	response.Method = request.Method
-	response.Data.Message = "transaction have been created successfully"
-	response.Data.IDTrunsuction, _ = result.LastInsertId()
-	SendResponse(&response, &w)
 }
 
 //Withdrawal method reduce balance value
 func (env *Env) Withdrawal(w http.ResponseWriter, r *http.Request) {
-	var request RequestStruct
-	var response ResponseStruct
-	if err := ReadRequest(r, &request); err != nil {
-		http.Error(w, err.Error(), 300)
-		return
+	fmt.Println(r.Method)
+	if r.Method == "POST" {
+		var request RequestStruct
+		var response ResponseStruct
+		if err := ReadRequest(r, &request); err != nil {
+			http.Error(w, err.Error(), 300)
+			return
+		}
+		if err := env.CheckUser(request.Data.WithdrawalData.ID); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		if err := env.CheckBalance(request.Data.WithdrawalData.ID, request.Data.WithdrawalData.Value); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		result, err := env.db.Exec("insert into transactions (user_id, tr_value, info, tr_date) values(?,?,?,now())",
+			request.Data.WithdrawalData.ID, -request.Data.WithdrawalData.Value, "withdrawal")
+		if err != nil {
+			http.Error(w, "Database: error add transaction to database", 500)
+			return
+		}
+		if err = env.ChangeBalance(request.Data.WithdrawalData.ID, -request.Data.WithdrawalData.Value); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		response.Method = request.Method
+		response.Data.Message = "transaction have been created successfully"
+		response.Data.IDTrunsuction, _ = result.LastInsertId()
+		SendResponse(&response, &w)
+	} else {
+		http.Error(w, "Request: method", 500)
 	}
-	if err := env.CheckUser(request.Data.WithdrawalData.ID); err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	if err := env.CheckBalance(request.Data.WithdrawalData.ID, request.Data.WithdrawalData.Value); err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	result, err := env.db.Exec("insert into transactions (user_id, tr_value, info, tr_date) values(?,?,?,now())",
-		request.Data.WithdrawalData.ID, -request.Data.WithdrawalData.Value, "withdrawal")
-	if err != nil {
-		http.Error(w, "Database: error add transaction to database", 500)
-		return
-	}
-	if err = env.ChangeBalance(request.Data.WithdrawalData.ID, -request.Data.WithdrawalData.Value); err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	response.Method = request.Method
-	response.Data.Message = "transaction have been created successfully"
-	response.Data.IDTrunsuction, _ = result.LastInsertId()
-	SendResponse(&response, &w)
 }
 
 //Transfer method transmit value between two users
 func (env *Env) Transfer(w http.ResponseWriter, r *http.Request) {
-	var request RequestStruct
-	var response ResponseStruct
-	if err := ReadRequest(r, &request); err != nil {
-		http.Error(w, err.Error(), 300)
-		return
+	if r.Method == "POST" {
+		var response ResponseStruct
+		var request RequestStruct
+		if err := ReadRequest(r, &request); err != nil {
+			http.Error(w, err.Error(), 300)
+			return
+		}
+		if err := env.CheckUser(request.Data.TransferData.IDFrom); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		if err := env.CheckUser(request.Data.TransferData.IDTo); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		if err := env.CheckBalance(request.Data.TransferData.IDFrom, request.Data.TransferData.Value); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		result, err := env.db.Exec("insert into transactions (user_id, tr_value, info, tr_date) values(?,?,?,now())",
+			request.Data.TransferData.IDFrom, -request.Data.TransferData.Value, "transfer")
+		if err != nil {
+			http.Error(w, "Database: error add transaction to database", 500)
+			return
+		}
+		response.Data.IDTrunsuction, _ = result.LastInsertId()
+		_, err = env.db.Exec("insert into transactions values(?,?,?,?,now())",
+			response.Data.IDTrunsuction, request.Data.TransferData.IDTo, request.Data.TransferData.Value, "transfer")
+		if err != nil {
+			http.Error(w, "Database: updaate error", 500)
+			return
+		}
+		if err = env.ChangeBalance(request.Data.TransferData.IDFrom, -request.Data.TransferData.Value); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		if err = env.ChangeBalance(request.Data.TransferData.IDTo, request.Data.TransferData.Value); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		response.Method = request.Method
+		response.Data.Message = "Transaction have been created successfully"
+		SendResponse(&response, &w)
+	} else {
+		http.Error(w, "Request: method", 500)
 	}
-	if err := env.CheckUser(request.Data.TransferData.IDFrom); err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	if err := env.CheckUser(request.Data.TransferData.IDTo); err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	if err := env.CheckBalance(request.Data.TransferData.IDFrom, request.Data.TransferData.Value); err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	result, err := env.db.Exec("insert into transactions (user_id, tr_value, info, tr_date) values(?,?,?,now())",
-		request.Data.TransferData.IDFrom, -request.Data.TransferData.Value, "transfer")
-	if err != nil {
-		http.Error(w, "Database: error add transaction to database", 500)
-		return
-	}
-	response.Data.IDTrunsuction, _ = result.LastInsertId()
-	_, err = env.db.Exec("insert into transactions values(?,?,?,?,now())",
-		response.Data.IDTrunsuction, request.Data.TransferData.IDTo, request.Data.TransferData.Value, "transfer")
-	if err != nil {
-		http.Error(w, "Database: updaate error", 500)
-		return
-	}
-	if err = env.ChangeBalance(request.Data.TransferData.IDFrom, -request.Data.TransferData.Value); err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	if err = env.ChangeBalance(request.Data.TransferData.IDTo, request.Data.TransferData.Value); err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	response.Method = request.Method
-	response.Data.Message = "Transaction have been created successfully"
-	SendResponse(&response, &w)
 }
 
 func main() {
