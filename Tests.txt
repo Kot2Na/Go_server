@@ -1,16 +1,36 @@
 Test AddUser:
-curl --data '{"method":"adduser","data":{"add_user":{"first_name":"kotik","last_name":"katya"}}}' --header "Content-Type: application/json" http://localhost:8080/AddUser
+curl -X POST --data '{"method":"adduser","data":{"user":{"first_name":"kotik","last_name":"katya"}}}' --header "Content-Type: application/json" http://localhost:8080/AddUser
 
-Test Transaction:
-curl --data '{"method":"replenishment","data":{"replenishment":{"id":4,"value":3.2}}}' --header "Content-Type: application/json" http://localhost:8080/Replenishment
+Test Replenishment:
+curl -X POST --data '{"method":"replenishment","data":{"replenishment":{"id":4,"value":3.2}}}' --header "Content-Type: application/json" http://localhost:8080/Replenishment
 
 Test Withdrawal:
-curl --data '{"method":"withdrawal","data":{"withdrawal":{"id":9,"value":3.2}}}' --header "Content-Type: application/json" http://localhost:8080/Withdrawal
+curl -X POST --data '{"method":"withdrawal","data":{"withdrawal":{"id":9,"value":3.2}}}' --header "Content-Type: application/json" http://localhost:8080/Withdrawal
 
 Test Transfer:
-curl --data '{"method":"transfer","data":{"transfer":{"id_from":9,"id_to":10,"value":3.2}}}' --header "Content-Type: application/json" http://localhost:8080/Transfer
+curl -X POST --data '{"method":"transfer","data":{"transfer":{"id_from":9,"id_to":10,"value":3.2}}}' --header "Content-Type: application/json" http://localhost:8080/Transfer
 
 Test Balance:
-curl --data '{"method":"balance","data":{"user":{"id":10}, "currency":"EUR"}}' --header "Content-Type: application/json" http://localhost:8080/Balance
-curl --data '{"method":"balance","data":{"user":{"id":10}, "currency":"RUB"}}' --header "Content-Type: application/json" http://localhost:8080/Balance
-curl --data '{"method":"balance","data":{"user":{"id":10}, "currency":"USD"}}' --header "Content-Type: application/json" http://localhost:8080/Balance
+curl -X GET --data '{"method":"balance","data":{"user":{"id":10}, "currency":"EUR"}}' --header "Content-Type: application/json" http://localhost:8080/Balance
+curl -X GET --data '{"method":"balance","data":{"user":{"id":10}, "currency":"RUB"}}' --header "Content-Type: application/json" http://localhost:8080/Balance
+curl -X GET --data '{"method":"balance","data":{"user":{"id":10}, "currency":"USD"}}' --header "Content-Type: application/json" http://localhost:8080/Balance
+
+Test Transactions:
+curl -X GET --data '{"method":"transactions","data":{"user":{"id":12},"sort":"value"}}' --header "Content-Type: application/json" http://localhost:8080/Transactions
+
+Usage scenario:
+curl -X POST --data '{"method":"adduser","data":{"user":{"first_name":"name_1","last_name":"surname_1"}}}' --header "Content-Type: application/json" http://localhost:8080/AddUser
+curl -X POST --data '{"method":"adduser","data":{"user":{"first_name":"name_2","last_name":"surname_2"}}}' --header "Content-Type: application/json" http://localhost:8080/AddUser
+curl -X POST --data '{"method":"adduser","data":{"user":{"first_name":"name_3","last_name":"surname_3"}}}' --header "Content-Type: application/json" http://localhost:8080/AddUser
+curl -X POST --data '{"method":"replenishment","data":{"replenishment":{"id":1,"value":20000.5}}}' --header "Content-Type: application/json" http://localhost:8080/Replenishment
+curl -X POST --data '{"method":"withdrawal","data":{"withdrawal":{"id":1,"value":232.23}}}' --header "Content-Type: application/json" http://localhost:8080/Withdrawal
+curl -X POST --data '{"method":"transfer","data":{"transfer":{"id_from":1,"id_to":2,"value":5500.6}}}' --header "Content-Type: application/json" http://localhost:8080/Transfer
+curl -X POST --data '{"method":"withdrawal","data":{"withdrawal":{"id":2,"value":5000}}}' --header "Content-Type: application/json" http://localhost:8080/Withdrawal
+curl -X POST --data '{"method":"transfer","data":{"transfer":{"id_from":1,"id_to":3,"value":8000.45}}}' --header "Content-Type: application/json" http://localhost:8080/Transfer
+curl -X GET --data '{"method":"balance","data":{"user":{"id":1}, "currency":"RUB"}}' --header "Content-Type: application/json" http://localhost:8080/Balance
+curl -X GET --data '{"method":"balance","data":{"user":{"id":2}, "currency":"RUB"}}' --header "Content-Type: application/json" http://localhost:8080/Balance
+curl -X GET --data '{"method":"balance","data":{"user":{"id":3}, "currency":"RUB"}}' --header "Content-Type: application/json" http://localhost:8080/Balance
+curl -X GET --data '{"method":"balance","data":{"user":{"id":1}, "currency":"USD"}}' --header "Content-Type: application/json" http://localhost:8080/Balance
+curl -X GET --data '{"method":"transactions","data":{"user":{"id":1},"sort":"value"}}' --header "Content-Type: application/json" http://localhost:8080/Transactions
+curl -X GET --data '{"method":"transactions","data":{"user":{"id":1},"sort":"time"}}' --header "Content-Type: application/json" http://localhost:8080/Transactions
+

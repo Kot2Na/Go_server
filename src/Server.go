@@ -139,7 +139,7 @@ func (env *Env) ChangeBalance(userid int64, sum float64) error {
 
 // GetTransactionList method returns list of users transaction
 func (env *Env) GetTransactionList(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "POST" {
+	if r.Method == "GET" {
 		var request RequestStruct
 		var response ResponseStruct
 		var sort string
@@ -209,7 +209,7 @@ func (env *Env) AddUser(w http.ResponseWriter, r *http.Request) {
 
 //Balance method returns the value of user's balance in different currency
 func (env *Env) Balance(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "POST" {
+	if r.Method == "GET" {
 		var request RequestStruct
 		var response ResponseStruct
 		var balance float64
@@ -282,7 +282,6 @@ func (env *Env) Replenishment(w http.ResponseWriter, r *http.Request) {
 
 //Withdrawal method reduce balance value
 func (env *Env) Withdrawal(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(r.Method)
 	if r.Method == "POST" {
 		var request RequestStruct
 		var response ResponseStruct
