@@ -144,11 +144,11 @@ func (env *Env) GetTransactionList(w http.ResponseWriter, r *http.Request) {
 		var response ResponseStruct
 		var sort string
 		if err := ReadRequest(r, &request); err != nil {
-			http.Error(w, err.Error(), 300)
+			http.Error(w, err.Error(), 400)
 			return
 		}
 		if err := env.CheckUser(request.Data.User.IDUser); err != nil {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, err.Error(), 400)
 			return
 		}
 		if request.Data.Sort == "time" {
@@ -184,7 +184,7 @@ func (env *Env) AddUser(w http.ResponseWriter, r *http.Request) {
 		var request RequestStruct
 		var response ResponseStruct
 		if err := ReadRequest(r, &request); err != nil {
-			http.Error(w, err.Error(), 300)
+			http.Error(w, err.Error(), 400)
 			return
 		}
 		result, err := env.db.Exec("insert into users_info (first_name, last_name, reg_date) values(?,?,now())",
@@ -214,24 +214,24 @@ func (env *Env) Balance(w http.ResponseWriter, r *http.Request) {
 		var response ResponseStruct
 		var balance float64
 		if err := ReadRequest(r, &request); err != nil {
-			http.Error(w, err.Error(), 300)
+			http.Error(w, err.Error(), 400)
 			return
 		}
 		if err := env.CheckUser(request.Data.User.IDUser); err != nil {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, err.Error(), 400)
 			return
 		}
 		result := env.db.QueryRow("select round(balance, 3) from users_balance where user_id = ?",
 			request.Data.User.IDUser)
 		if err := result.Scan(&balance); err != nil {
-			http.Error(w, "Database: read error", 300)
+			http.Error(w, "Database: read error", 500)
 			return
 		}
 		if request.Data.Currency != "RUB" {
 			var result map[string]map[string]float64
 			r, err := http.Get("https://api.exchangeratesapi.io/latest?base=RUB")
 			if err != nil {
-				http.Error(w, "Currency service does't respond", 300)
+				http.Error(w, "Currency service does't respond", 500)
 				return
 			}
 			byteValue, _ := ioutil.ReadAll(r.Body)
@@ -254,11 +254,11 @@ func (env *Env) Replenishment(w http.ResponseWriter, r *http.Request) {
 		var request RequestStruct
 		var response ResponseStruct
 		if err := ReadRequest(r, &request); err != nil {
-			http.Error(w, err.Error(), 300)
+			http.Error(w, err.Error(), 400)
 			return
 		}
 		if err := env.CheckUser(request.Data.ReplenishmentData.ID); err != nil {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, err.Error(), 400)
 			return
 		}
 		result, err := env.db.Exec("insert into transactions (user_id, tr_value, info, tr_date) values(?,?,?,now())",
@@ -286,15 +286,15 @@ func (env *Env) Withdrawal(w http.ResponseWriter, r *http.Request) {
 		var request RequestStruct
 		var response ResponseStruct
 		if err := ReadRequest(r, &request); err != nil {
-			http.Error(w, err.Error(), 300)
+			http.Error(w, err.Error(), 400)
 			return
 		}
 		if err := env.CheckUser(request.Data.WithdrawalData.ID); err != nil {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, err.Error(), 400)
 			return
 		}
 		if err := env.CheckBalance(request.Data.WithdrawalData.ID, request.Data.WithdrawalData.Value); err != nil {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, err.Error(), 400)
 			return
 		}
 		result, err := env.db.Exec("insert into transactions (user_id, tr_value, info, tr_date) values(?,?,?,now())",
@@ -322,19 +322,19 @@ func (env *Env) Transfer(w http.ResponseWriter, r *http.Request) {
 		var response ResponseStruct
 		var request RequestStruct
 		if err := ReadRequest(r, &request); err != nil {
-			http.Error(w, err.Error(), 300)
+			http.Error(w, err.Error(), 400)
 			return
 		}
 		if err := env.CheckUser(request.Data.TransferData.IDFrom); err != nil {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, err.Error(), 400)
 			return
 		}
 		if err := env.CheckUser(request.Data.TransferData.IDTo); err != nil {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, err.Error(), 400)
 			return
 		}
 		if err := env.CheckBalance(request.Data.TransferData.IDFrom, request.Data.TransferData.Value); err != nil {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, err.Error(), 400)
 			return
 		}
 		result, err := env.db.Exec("insert into transactions (user_id, tr_value, info, tr_date) values(?,?,?,now())",
@@ -362,7 +362,7 @@ func (env *Env) Transfer(w http.ResponseWriter, r *http.Request) {
 		response.Data.Message = "Transaction have been created successfully"
 		SendResponse(&response, &w)
 	} else {
-		http.Error(w, "Request: method", 500)
+		http.Error(w, "Request: method", 400)
 	}
 }
 
