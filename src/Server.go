@@ -65,24 +65,41 @@ type RequestStruct struct {
 	Data   RequestData `json:"data"`
 }
 
-//ResponseData response data
-type ResponseData struct {
-	Message           string
-	IDUser            int64
-	IDTrunsuction     int64
-	UserBalance       float64
+//ResponseUser response data
+type ResponseUser struct {
+	IDUser int64 `json:"user_id"`
+}
+
+//ResponseTran asd
+type ResponseTran struct {
+	IDTrunsuction int64 `json:"transaction_id"`
+}
+
+//ResponseBalance asd
+type ResponseBalance struct {
+	Currency    string  `json:"currency"`
+	UserBalance float64 `json:"value"`
+}
+
+//ResponseTranList asd
+type ResponseTranList struct {
 	UsersTransactions []Transaction `json:"userstransactions"`
 }
 
 //ResponseStruct main response struct
 type ResponseStruct struct {
-	Method string
-	Data   ResponseData
+	Method  string
+	Message string
+	Data    interface{}
 }
 
 //SendResponse method response on request
-func SendResponse(response *ResponseStruct, w *http.ResponseWriter) {
-	responseJSON, _ := json.Marshal(*response)
+func SendResponse(mes string, meth string, w *http.ResponseWriter, data interface{}) {
+	var response ResponseStruct
+	response.Method = meth
+	response.Message = mes
+	response.Data = data
+	responseJSON, _ := json.Marshal(response)
 	(*w).Write(responseJSON)
 }
 
@@ -141,7 +158,7 @@ func (env *Env) ChangeBalance(userid int64, sum float64) error {
 func (env *Env) GetTransactionList(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		var request RequestStruct
-		var response ResponseStruct
+		var list ResponseTranList
 		var sort string
 		if err := ReadRequest(r, &request); err != nil {
 			http.Error(w, err.Error(), 400)
@@ -168,11 +185,9 @@ func (env *Env) GetTransactionList(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Database: scan table error", 500)
 				return
 			}
-			response.Data.UsersTransactions = append(response.Data.UsersTransactions, Tr)
+			list.UsersTransactions = append(list.UsersTransactions, Tr)
 		}
-		response.Data.Message = "List have been created"
-		response.Method = request.Method
-		SendResponse(&response, &w)
+		SendResponse("List have been created", request.Method, &w, list)
 	} else {
 		http.Error(w, "Request: method", 500)
 	}
@@ -182,7 +197,7 @@ func (env *Env) GetTransactionList(w http.ResponseWriter, r *http.Request) {
 func (env *Env) AddUser(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		var request RequestStruct
-		var response ResponseStruct
+		var user ResponseUser
 		if err := ReadRequest(r, &request); err != nil {
 			http.Error(w, err.Error(), 400)
 			return
@@ -193,15 +208,13 @@ func (env *Env) AddUser(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Database: error add user to database", 500)
 			return
 		}
-		response.Data.IDUser, _ = result.LastInsertId()
+		user.IDUser, _ = result.LastInsertId()
 		if _, err := env.db.Exec("insert into users_balance values(?,0)",
-			response.Data.IDUser); err != nil {
+			user.IDUser); err != nil {
 			http.Error(w, "Database: error set user's balance to database", 500)
 			return
 		}
-		response.Data.Message = "User have been created successfully"
-		response.Method = request.Method
-		SendResponse(&response, &w)
+		SendResponse("User have been created successfully", request.Method, &w, user)
 	} else {
 		http.Error(w, "Request: method", 500)
 	}
@@ -211,8 +224,7 @@ func (env *Env) AddUser(w http.ResponseWriter, r *http.Request) {
 func (env *Env) Balance(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		var request RequestStruct
-		var response ResponseStruct
-		var balance float64
+		var balance ResponseBalance
 		if err := ReadRequest(r, &request); err != nil {
 			http.Error(w, err.Error(), 400)
 			return
@@ -223,7 +235,7 @@ func (env *Env) Balance(w http.ResponseWriter, r *http.Request) {
 		}
 		result := env.db.QueryRow("select round(balance, 3) from users_balance where user_id = ?",
 			request.Data.User.IDUser)
-		if err := result.Scan(&balance); err != nil {
+		if err := result.Scan(&balance.UserBalance); err != nil {
 			http.Error(w, "Database: read error", 500)
 			return
 		}
@@ -236,13 +248,10 @@ func (env *Env) Balance(w http.ResponseWriter, r *http.Request) {
 			}
 			byteValue, _ := ioutil.ReadAll(r.Body)
 			json.Unmarshal([]byte(byteValue), &result)
-			balance = math.Round(balance*result["rates"][request.Data.Currency]*1000) / 1000
+			balance.UserBalance = math.Round(balance.UserBalance*result["rates"][request.Data.Currency]*1000) / 1000
 		}
-		response.Data.IDUser = request.Data.User.IDUser
-		response.Data.UserBalance = balance
-		response.Data.Message = "User's balance"
-		response.Method = request.Method
-		SendResponse(&response, &w)
+		balance.Currency = request.Data.Currency
+		SendResponse("User's balance", request.Method, &w, balance)
 	} else {
 		http.Error(w, "Request: method", 500)
 	}
@@ -252,7 +261,7 @@ func (env *Env) Balance(w http.ResponseWriter, r *http.Request) {
 func (env *Env) Replenishment(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		var request RequestStruct
-		var response ResponseStruct
+		var transaction ResponseTran
 		if err := ReadRequest(r, &request); err != nil {
 			http.Error(w, err.Error(), 400)
 			return
@@ -271,10 +280,8 @@ func (env *Env) Replenishment(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		response.Method = request.Method
-		response.Data.Message = "transaction have been created successfully"
-		response.Data.IDTrunsuction, _ = result.LastInsertId()
-		SendResponse(&response, &w)
+		transaction.IDTrunsuction, _ = result.LastInsertId()
+		SendResponse("transaction have been created successfully", request.Method, &w, transaction)
 	} else {
 		http.Error(w, "Request: method", 500)
 	}
@@ -284,7 +291,7 @@ func (env *Env) Replenishment(w http.ResponseWriter, r *http.Request) {
 func (env *Env) Withdrawal(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		var request RequestStruct
-		var response ResponseStruct
+		var transaction ResponseTran
 		if err := ReadRequest(r, &request); err != nil {
 			http.Error(w, err.Error(), 400)
 			return
@@ -307,10 +314,8 @@ func (env *Env) Withdrawal(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		response.Method = request.Method
-		response.Data.Message = "transaction have been created successfully"
-		response.Data.IDTrunsuction, _ = result.LastInsertId()
-		SendResponse(&response, &w)
+		transaction.IDTrunsuction, _ = result.LastInsertId()
+		SendResponse("transaction have been created successfully", request.Method, &w, transaction)
 	} else {
 		http.Error(w, "Request: method", 500)
 	}
@@ -319,8 +324,8 @@ func (env *Env) Withdrawal(w http.ResponseWriter, r *http.Request) {
 //Transfer method transmit value between two users
 func (env *Env) Transfer(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
-		var response ResponseStruct
 		var request RequestStruct
+		var transaction ResponseTran
 		if err := ReadRequest(r, &request); err != nil {
 			http.Error(w, err.Error(), 400)
 			return
@@ -343,9 +348,9 @@ func (env *Env) Transfer(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Database: error add transaction to database", 500)
 			return
 		}
-		response.Data.IDTrunsuction, _ = result.LastInsertId()
+		transaction.IDTrunsuction, _ = result.LastInsertId()
 		_, err = env.db.Exec("insert into transactions values(?,?,?,?,now())",
-			response.Data.IDTrunsuction, request.Data.TransferData.IDTo, request.Data.TransferData.Value, "transfer")
+			transaction.IDTrunsuction, request.Data.TransferData.IDTo, request.Data.TransferData.Value, "transfer")
 		if err != nil {
 			http.Error(w, "Database: updaate error", 500)
 			return
@@ -358,9 +363,8 @@ func (env *Env) Transfer(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		response.Method = request.Method
-		response.Data.Message = "Transaction have been created successfully"
-		SendResponse(&response, &w)
+		transaction.IDTrunsuction, _ = result.LastInsertId()
+		SendResponse("transaction have been created successfully", request.Method, &w, transaction)
 	} else {
 		http.Error(w, "Request: method", 400)
 	}
